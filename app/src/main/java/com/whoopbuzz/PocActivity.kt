@@ -39,18 +39,19 @@ class PocActivity : ComponentActivity() {
                 val launcher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
                 ) { res ->
-                    if (res.values.all { it }) client.startScan() else logs.add(0, "Permessi negati")
+                    if (res.values.all { it }) client.connectBonded() else logs.add(0, "Permessi negati")
                 }
                 Column(
                     Modifier.fillMaxSize().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text("WhoopBuzz PoC", style = MaterialTheme.typography.headlineSmall)
-                    Text("Chiudi l'app WHOOP ufficiale e il Bluetooth dello strap deve essere libero.", fontSize = 12.sp)
+                    Text("Lo strap deve essere associato al telefono. L'app WHOOP puo restare connessa.", fontSize = 12.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { launcher.launch(perms) }) { Text("Scan") }
+                        Button(onClick = { launcher.launch(perms) }) { Text("Connetti") }
                         Button(onClick = { client.sendHello() }) { Text("Hello") }
                         Button(onClick = { client.sendBuzz(1) }) { Text("Buzz") }
+                        Button(onClick = { client.disconnect() }) { Text("Stop") }
                     }
                     LazyColumn { items(logs) { Text(it, fontSize = 11.sp) } }
                 }

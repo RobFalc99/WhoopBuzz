@@ -45,12 +45,25 @@ class WhoopBleClient(context: Context, private val log: (String) -> Unit) {
         override fun onScanFailed(errorCode: Int) = log("Scan fallita: $errorCode")
     }
 
+    /** Connect straight to the already-bonded WHOOP (no scan): a connected strap does not advertise. */
+    fun connectBonded() {
+        val dev = adapter.bondedDevices.firstOrNull { it.name?.startsWith("WHOOP", ignoreCase = true) == true }
+        if (dev == null) {
+            log("Nessun WHOOP associato (${adapter.bondedDevices.size} dispositivi associati): provo la scansione")
+            startScan()
+            return
+        }
+        log("WHOOP associato: ${dev.name} ${dev.address}")
+        connect(dev)
+    }
+
     fun startScan() {
-        val filter = ScanFilter.Builder()
+        val byService = ScanFilter.Builder()
             .setServiceUuid(ParcelUuid(UUID.fromString(Whoop5Protocol.SERVICE_UUID))).build()
+        val byName = ScanFilter.Builder().setDeviceName("WHOOP").build()
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
-        log("Scansione WHOOP 5.0/MG (service fd4b0001)...")
-        adapter.bluetoothLeScanner.startScan(listOf(filter), settings, scanCb)
+        log("Scansione WHOOP 5.0/MG...")
+        adapter.bluetoothLeScanner.startScan(listOf(byService), settings, scanCb)
     }
 
     fun stopScan() = adapter.bluetoothLeScanner.stopScan(scanCb)
