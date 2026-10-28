@@ -2,6 +2,76 @@ package com.whoopbuzz.protocol
 
 import java.util.zip.CRC32
 
+/** User-defined or preset haptic pattern persisted by name. */
+data class SavedPattern(
+    val name: String,
+    val effects: String,
+    val loops: Int = 0,
+)
+
+/**
+ * Pure JVM codec + resolver for user-saved patterns (`name|effects|loops` per line).
+ */
+object PatternStoreCodec {
+    val DEFAULT_PATTERNS: List<SavedPattern> = listOf(
+        SavedPattern("single", "47", 0),
+        SavedPattern("double", "47,152,47", 0),
+        SavedPattern("triple", "47,152,47,152,47", 0),
+        SavedPattern("long", "47,47,47", 0),
+        SavedPattern("pulse", "52", 0),
+    )
+
+    fun encode(list: List<SavedPattern>): String =
+        list.joinToString("\n") { p ->
+            val safeName = p.name.replace("|", "").replace("\n", "").trim()
+            val safeEff = Whoop5Protocol.parseEffects(p.effects).joinToString(",")
+            "$safeName|$safeEff|${p.loops.coerceIn(0, 5)}"
+        }
+
+    fun decode(raw: String?): List<SavedPattern> {
+        if (raw.isNullOrBlank()) return DEFAULT_PATTERNS
+        val parsed = raw.lines().mapNotNull { line ->
+            val parts = line.split('|')
+            if (parts.size < 2) return@mapNotNull null
+            val name = parts[0].trim()
+            val eff = Whoop5Protocol.parseEffects(parts[1]).joinToString(",")
+            val loops = parts.getOrNull(2)?.trim()?.toIntOrNull()?.coerceIn(0, 5) ?: 0
+            if (name.isEmpty() || eff.isEmpty()) null else SavedPattern(name, eff, loops)
+        }
+        return parsed.ifEmpty { DEFAULT_PATTERNS }
+    }
+
+    fun upsert(list: List<SavedPattern>, item: SavedPattern): List<SavedPattern> {
+        val cleanName = item.name.replace("|", "").trim()
+        val cleanEff = Whoop5Protocol.parseEffects(item.effects).joinToString(",")
+        if (cleanName.isEmpty() || cleanEff.isEmpty()) return list
+        val normalized = SavedPattern(cleanName, cleanEff, item.loops.coerceIn(0, 5))
+        val idx = list.indexOfFirst { it.name.equals(cleanName, ignoreCase = true) }
+        return if (idx >= 0) list.toMutableList().also { it[idx] = normalized } else list + normalized
+    }
+
+    fun delete(list: List<SavedPattern>, name: String): List<SavedPattern> =
+        list.filterNot { it.name.equals(name.trim(), ignoreCase = true) }
+
+    /**
+     * Resolve a pattern name or raw effects string against saved patterns first, then built-ins.
+     * Returns pair of (effectsSpec, loops).
+     */
+    fun resolveRequest(
+        saved: List<SavedPattern>,
+        spec: String,
+        explicitLoops: Int? = null,
+    ): Pair<String, Int> {
+        val trimmed = spec.trim()
+        val match = saved.firstOrNull { it.name.equals(trimmed, ignoreCase = true) }
+        return if (match != null) {
+            match.effects to (explicitLoops ?: match.loops).coerceIn(0, 5)
+        } else {
+            trimmed to (explicitLoops ?: 0).coerceIn(0, 5)
+        }
+    }
+}
+
 /**
  * WHOOP 5.0 / MG ("puffin") wire protocol: frame builder + haptic payload.
  * Byte layouts come from community reverse engineering (noop / goose); see docs/.
@@ -69,11 +139,6 @@ object Whoop5Protocol {
 
     fun crc32(data: ByteArray): Long = CRC32().also { it.update(data) }.value
 
-    /**
-     * Build a command frame:
-     * `AA 01 declLen(u16 LE) 00 01 crc16(u16 LE) | [0x23 seq cmd params..] zero-padded to x4 | crc32`.
-     * declLen = padded body size + 4 (CRC32 trailer).
-     */
     fun command(cmd: Int, seq: Int, params: ByteArray = ByteArray(0)): ByteArray {
         var body = byteArrayOf(TYPE_COMMAND.toByte(), seq.toByte(), cmd.toByte()) + params
         val pad = (4 - body.size % 4) % 4
@@ -95,7 +160,6 @@ object Whoop5Protocol {
             )
     }
 
-    /** Session opener: GET_HELLO with param 0x01 (identical to the known static CLIENT_HELLO). */
     fun hello(seq: Int = 1): ByteArray = command(CMD_GET_HELLO, seq, byteArrayOf(0x01))
 
     fun buzz(pattern: String = DEFAULT_PATTERN, loops: Int = 0, seq: Int = 2): ByteArray =

@@ -47,4 +47,24 @@ class Whoop5ProtocolTest {
         assertEquals(declLen + 8, f.size)
         assertEquals(0x13, f[10].toInt() and 0xFF)
     }
+
+    @Test
+    fun patternStoreCodecRoundTripAndUpsert() {
+        val initial = PatternStoreCodec.decode(null)
+        assertEquals(5, initial.size)
+        val updated = PatternStoreCodec.upsert(initial, SavedPattern("vip", "52, 152, 47", 1))
+        assertEquals(6, updated.size)
+        val replaced = PatternStoreCodec.upsert(updated, SavedPattern("VIP", "52,152,52", 2))
+        assertEquals(6, replaced.size)
+        val encoded = PatternStoreCodec.encode(replaced)
+        val decoded = PatternStoreCodec.decode(encoded)
+        assertEquals(replaced, decoded)
+        val (eff, loops) = PatternStoreCodec.resolveRequest(decoded, "vip", null)
+        assertEquals("52,152,52", eff)
+        assertEquals(2, loops)
+        val (_, overrideLoops) = PatternStoreCodec.resolveRequest(decoded, "vip", 0)
+        assertEquals(0, overrideLoops)
+        val afterDelete = PatternStoreCodec.delete(decoded, "vip")
+        assertEquals(5, afterDelete.size)
+    }
 }
