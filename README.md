@@ -17,7 +17,7 @@ Action `com.whoopbuzz.BUZZ`, package `com.whoopbuzz`.
 | Extra | Type | Notes |
 |-------|------|-------|
 | `token` | String | required, must equal the token set in the app |
-| `pattern` | String | `single` (default), `double`, `long` (legacy: A, B, C) |
+| `pattern` | String | `single` (default), `double`, `triple`, `long`, `pulse` (legacy: A, B, C) |
 | `effects` | String | optional raw list, e.g. `47,152,47` (overrides `pattern`); values >=128 are pauses (hypothesis) |
 | `loops` | Int | 0-5 |
 

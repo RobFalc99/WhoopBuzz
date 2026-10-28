@@ -24,14 +24,16 @@ object Whoop5Protocol {
     /** STOP_HAPTICS. */
     const val CMD_STOP_HAPTICS = 122
 
-    /** Haptic-driver style pause: values >= 128 are a delay of (value - 128) * 10 ms (hypothesis, DRV2605-like). */
-    fun pause(ms: Int): Int = 128 + (ms / 10).coerceIn(0, 127)
+    /** Hardware-verified pause byte on WHOOP 5.0/MG (produces a clean gap between 47 pulses). */
+    const val VERIFIED_PAUSE = 152
 
     /** Named haptic patterns (sequence of effect ids / pauses). A, B, C are legacy aliases. */
     val PATTERNS: Map<String, List<Int>> = mapOf(
         "single" to listOf(47),
-        "double" to listOf(47, pause(200), 47),
+        "double" to listOf(47, VERIFIED_PAUSE, 47),
+        "triple" to listOf(47, VERIFIED_PAUSE, 47, VERIFIED_PAUSE, 47),
         "long" to listOf(47, 47, 47),
+        "pulse" to listOf(52),
         "A" to listOf(47),
         "B" to listOf(152),
         "C" to listOf(47, 152),
@@ -55,6 +57,7 @@ object Whoop5Protocol {
     }
 
     fun buzzPayload(spec: String, loops: Int): ByteArray = buzzPayload(resolve(spec), loops)
+
     fun crc16Modbus(data: ByteArray, from: Int = 0, to: Int = data.size): Int {
         var crc = 0xFFFF
         for (i in from until to) {
@@ -95,7 +98,7 @@ object Whoop5Protocol {
     /** Session opener: GET_HELLO with param 0x01 (identical to the known static CLIENT_HELLO). */
     fun hello(seq: Int = 1): ByteArray = command(CMD_GET_HELLO, seq, byteArrayOf(0x01))
 
-    fun buzz(pattern: String = DEFAULT_PATTERN, loops: Int = 1, seq: Int = 2): ByteArray =
+    fun buzz(pattern: String = DEFAULT_PATTERN, loops: Int = 0, seq: Int = 2): ByteArray =
         command(CMD_RUN_HAPTIC_MAVERICK, seq, buzzPayload(pattern, loops))
 }
 

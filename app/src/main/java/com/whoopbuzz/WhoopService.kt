@@ -50,7 +50,7 @@ class WhoopService : Service() {
         }
         startForegroundCompat("Avvio...")
         intent?.getStringExtra(EXTRA_PATTERN)?.let {
-            pending.add(it to (intent.getIntExtra(EXTRA_LOOPS, 1)))
+            pending.add(it to (intent.getIntExtra(EXTRA_LOOPS, 0)))
         }
         if (!running) {
             running = true

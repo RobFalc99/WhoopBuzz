@@ -15,13 +15,6 @@ class Whoop5ProtocolTest {
     }
 
     @Test
-    fun pauseConversion() {
-        assertEquals(152, Whoop5Protocol.pause(240))
-        assertEquals(128, Whoop5Protocol.pause(0))
-        assertEquals(255, Whoop5Protocol.pause(99999))
-    }
-
-    @Test
     fun parseEffectsHandlesSeparatorsAndGarbage() {
         assertEquals(listOf(47, 152, 47), Whoop5Protocol.parseEffects("47,152, 47"))
         assertEquals(listOf(1, 2), Whoop5Protocol.parseEffects("1;x;2"))
@@ -32,7 +25,10 @@ class Whoop5ProtocolTest {
     @Test
     fun resolveNamesAndFallback() {
         assertEquals(listOf(47), Whoop5Protocol.resolve("SINGLE"))
-        assertEquals(listOf(47, 200 / 10 + 128, 47), Whoop5Protocol.resolve("double"))
+        assertEquals(listOf(47, 152, 47), Whoop5Protocol.resolve("double"))
+        assertEquals(listOf(47, 152, 47, 152, 47), Whoop5Protocol.resolve("triple"))
+        assertEquals(listOf(47, 47, 47), Whoop5Protocol.resolve("long"))
+        assertEquals(listOf(52), Whoop5Protocol.resolve("pulse"))
         assertEquals(listOf(47), Whoop5Protocol.resolve("nonsense"))
         assertEquals(listOf(14, 15), Whoop5Protocol.resolve("14,15"))
     }
@@ -41,12 +37,12 @@ class Whoop5ProtocolTest {
     fun loopsZeroAllowedAndClamped() {
         assertEquals(0, Whoop5Protocol.buzzPayload("single", 0).last().toInt())
         assertEquals(255, Whoop5Protocol.buzzPayload("single", 999).last().toInt() and 0xFF)
-        assertEquals(12, Whoop5Protocol.buzzPayload("single", 1).size)
+        assertEquals(12, Whoop5Protocol.buzzPayload("single", 0).size)
     }
 
     @Test
     fun buzzFrameIsConsistent() {
-        val f = Whoop5Protocol.buzz("single", 1, seq = 2)
+        val f = Whoop5Protocol.buzz("single", 0, seq = 2)
         val declLen = (f[2].toInt() and 0xFF) or ((f[3].toInt() and 0xFF) shl 8)
         assertEquals(declLen + 8, f.size)
         assertEquals(0x13, f[10].toInt() and 0xFF)

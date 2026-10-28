@@ -19,7 +19,7 @@ class BuzzReceiver : BroadcastReceiver() {
             return
         }
         val pattern = intent.getStringExtra("effects") ?: intent.getStringExtra("pattern") ?: Whoop5Protocol.DEFAULT_PATTERN
-        val loops = intent.getIntExtra("loops", intent.getStringExtra("loops")?.toIntOrNull() ?: 1).coerceIn(0, 5)
+        val loops = intent.getIntExtra("loops", intent.getStringExtra("loops")?.toIntOrNull() ?: 0).coerceIn(0, 5)
         Log.add("Broadcast buzz: pattern=$pattern loops=$loops")
         val svc = WhoopService.instance
         if (svc != null) svc.buzz(pattern, loops)
