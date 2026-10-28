@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -49,9 +50,11 @@ class PocActivity : ComponentActivity() {
                 ) { res ->
                     if (res.values.all { it }) WhoopService.start(this) else Log.add("Permessi negati")
                 }
-                fun buzz(p: String) {
+                var labEffects by remember { mutableStateOf("47,152,47") }
+                var labLoops by remember { mutableStateOf("0") }
+                fun buzz(p: String, loops: Int = 1) {
                     val s = WhoopService.instance
-                    if (s == null) Log.add("Avvia prima il servizio") else s.buzz(p, 1)
+                    if (s == null) Log.add("Avvia prima il servizio") else s.buzz(p, loops)
                 }
                 Column(
                     Modifier.fillMaxSize().padding(16.dp),
@@ -64,9 +67,26 @@ class PocActivity : ComponentActivity() {
                         OutlinedButton(onClick = { WhoopService.stop(this@PocActivity) }) { Text("Stop") }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { buzz("A") }) { Text("Buzz A") }
-                        Button(onClick = { buzz("B") }) { Text("Buzz B") }
-                        Button(onClick = { buzz("C") }) { Text("Buzz C") }
+                        Button(onClick = { buzz("single") }) { Text("Single") }
+                        Button(onClick = { buzz("double") }) { Text("Double") }
+                        Button(onClick = { buzz("long") }) { Text("Long") }
+                    }
+                    Text("Laboratorio (ID effetto 1-123, >=128 = pausa)", fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = labEffects, onValueChange = { labEffects = it },
+                            label = { Text("Effetti") }, singleLine = true, modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = labLoops, onValueChange = { labLoops = it },
+                            label = { Text("Loops") }, singleLine = true, modifier = Modifier.width(80.dp),
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { buzz(labEffects, labLoops.toIntOrNull() ?: 0) }) { Text("Invia") }
+                        listOf("1", "14", "15", "47", "52").forEach { id ->
+                            OutlinedButton(onClick = { buzz(id, labLoops.toIntOrNull() ?: 0) }) { Text(id) }
+                        }
                     }
                     OutlinedTextField(
                         value = token,

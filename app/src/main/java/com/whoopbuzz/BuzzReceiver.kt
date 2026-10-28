@@ -7,7 +7,7 @@ import com.whoopbuzz.protocol.Whoop5Protocol
 
 /**
  * Entry point for automation apps (MacroDroid/Tasker).
- * Broadcast action `com.whoopbuzz.BUZZ`, extras: token (required), pattern (A/B/C), loops (1-5).
+ * Broadcast action `com.whoopbuzz.BUZZ`, extras: token (required), effects "47,152,47" or pattern (single/double/long), loops (0-5).
  */
 class BuzzReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -18,8 +18,8 @@ class BuzzReceiver : BroadcastReceiver() {
             Log.add("Broadcast rifiutato: token mancante o errato")
             return
         }
-        val pattern = intent.getStringExtra("pattern") ?: Whoop5Protocol.DEFAULT_PATTERN
-        val loops = intent.getIntExtra("loops", intent.getStringExtra("loops")?.toIntOrNull() ?: 1).coerceIn(1, 5)
+        val pattern = intent.getStringExtra("effects") ?: intent.getStringExtra("pattern") ?: Whoop5Protocol.DEFAULT_PATTERN
+        val loops = intent.getIntExtra("loops", intent.getStringExtra("loops")?.toIntOrNull() ?: 1).coerceIn(0, 5)
         Log.add("Broadcast buzz: pattern=$pattern loops=$loops")
         val svc = WhoopService.instance
         if (svc != null) svc.buzz(pattern, loops)

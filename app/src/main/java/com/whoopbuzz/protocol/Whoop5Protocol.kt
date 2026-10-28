@@ -24,22 +24,37 @@ object Whoop5Protocol {
     /** STOP_HAPTICS. */
     const val CMD_STOP_HAPTICS = 122
 
-    /** Named haptic patterns (effect ids). A/B are single effects, C is the original two-pulse pair. */
+    /** Haptic-driver style pause: values >= 128 are a delay of (value - 128) * 10 ms (hypothesis, DRV2605-like). */
+    fun pause(ms: Int): Int = 128 + (ms / 10).coerceIn(0, 127)
+
+    /** Named haptic patterns (sequence of effect ids / pauses). A, B, C are legacy aliases. */
     val PATTERNS: Map<String, List<Int>> = mapOf(
+        "single" to listOf(47),
+        "double" to listOf(47, pause(200), 47),
+        "long" to listOf(47, 47, 47),
         "A" to listOf(47),
         "B" to listOf(152),
         "C" to listOf(47, 152),
     )
-    const val DEFAULT_PATTERN = "A"
+    const val DEFAULT_PATTERN = "single"
+
+    /** Parse "47,152,47" into ids; non-numeric parts are ignored, ids clamped to 0..255, max 8. */
+    fun parseEffects(spec: String): List<Int> =
+        spec.split(',', ' ', ';').mapNotNull { it.trim().toIntOrNull() }.map { it.coerceIn(0, 255) }.take(8)
+
+    /** A pattern name or a comma separated effect list. */
+    fun resolve(spec: String): List<Int> {
+        val named = PATTERNS.entries.firstOrNull { it.key.equals(spec.trim(), ignoreCase = true) }?.value
+        return named ?: parseEffects(spec).ifEmpty { PATTERNS.getValue(DEFAULT_PATTERN) }
+    }
 
     /** Payload of CMD_RUN_HAPTIC_MAVERICK: [rev=1][8 effects][loopControl u16=0][overallLoop]. */
     fun buzzPayload(effects: List<Int>, loops: Int): ByteArray {
         val eff = ByteArray(8) { i -> (effects.getOrElse(i) { 0 } and 0xFF).toByte() }
-        return byteArrayOf(0x01) + eff + byteArrayOf(0x00, 0x00, loops.coerceIn(1, 255).toByte())
+        return byteArrayOf(0x01) + eff + byteArrayOf(0x00, 0x00, loops.coerceIn(0, 255).toByte())
     }
 
-    fun buzzPayload(pattern: String, loops: Int): ByteArray =
-        buzzPayload(PATTERNS[pattern.uppercase()] ?: PATTERNS.getValue(DEFAULT_PATTERN), loops)
+    fun buzzPayload(spec: String, loops: Int): ByteArray = buzzPayload(resolve(spec), loops)
     fun crc16Modbus(data: ByteArray, from: Int = 0, to: Int = data.size): Int {
         var crc = 0xFFFF
         for (i in from until to) {

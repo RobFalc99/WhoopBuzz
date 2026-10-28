@@ -9,7 +9,7 @@ Open https://robfalc99.github.io/WhoopBuzz/ on the phone (or scan the QR) and in
 ## Setup
 1. The strap must be bonded with the phone (the official WHOOP app can stay connected).
 2. Open WhoopBuzz, set a **token**, tap **Avvia servizio**, and exclude the app from battery optimization.
-3. Try **Buzz A / B / C** to pick the pattern you like (A and B are single pulses, C is the original double).
+3. Use the **Laboratorio** to try effect sequences and loops, then the Single / Double / Long buttons.
 
 ## Broadcast API
 Action `com.whoopbuzz.BUZZ`, package `com.whoopbuzz`.
@@ -17,8 +17,9 @@ Action `com.whoopbuzz.BUZZ`, package `com.whoopbuzz`.
 | Extra | Type | Notes |
 |-------|------|-------|
 | `token` | String | required, must equal the token set in the app |
-| `pattern` | String | `A` (default), `B`, `C` |
-| `loops` | Int | 1-5 |
+| `pattern` | String | `single` (default), `double`, `long` (legacy: A, B, C) |
+| `effects` | String | optional raw list, e.g. `47,152,47` (overrides `pattern`); values >=128 are pauses (hypothesis) |
+| `loops` | Int | 0-5 |
 
 Test from a PC:
 
