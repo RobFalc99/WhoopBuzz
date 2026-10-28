@@ -24,7 +24,12 @@ import java.util.UUID
  * Caller must hold BLUETOOTH_SCAN / BLUETOOTH_CONNECT before calling.
  */
 @SuppressLint("MissingPermission")
-class WhoopBleClient(context: Context, private val log: (String) -> Unit) {
+class WhoopBleClient(
+    context: Context,
+    private val log: (String) -> Unit,
+    private val onReady: () -> Unit = {},
+    private val onDisconnected: () -> Unit = {},
+) {
     private val appContext = context.applicationContext
     private val adapter: BluetoothAdapter =
         (appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
@@ -77,7 +82,13 @@ class WhoopBleClient(context: Context, private val log: (String) -> Unit) {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             log("Stato connessione: status=$status state=$newState")
             if (newState == BluetoothProfile.STATE_CONNECTED) g.discoverServices()
-            else if (newState == BluetoothProfile.STATE_DISCONNECTED) cmdChar = null
+            else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                cmdChar = null
+                writeQueue.clear(); writing = false
+                g.close()
+                if (gatt === g) gatt = null
+                onDisconnected()
+            }
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
@@ -97,6 +108,8 @@ class WhoopBleClient(context: Context, private val log: (String) -> Unit) {
 
         override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
             log("Write ${c.uuid.toString().take(8)} status=$status")
+            writing = false
+            pumpQueue()
         }
 
         @Deprecated("Deprecated in API 33")
@@ -112,7 +125,9 @@ class WhoopBleClient(context: Context, private val log: (String) -> Unit) {
     private fun nextNotify(g: BluetoothGatt) {
         val c = pendingNotify.removeFirstOrNull()
         if (c == null) {
-            log("Pronto. Premi 'Hello' poi 'Buzz'.")
+            log("Pronto.")
+            sendHello()
+            onReady()
             return
         }
         g.setCharacteristicNotification(c, true)
@@ -121,18 +136,32 @@ class WhoopBleClient(context: Context, private val log: (String) -> Unit) {
         g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
     }
 
+    private val writeQueue = ArrayDeque<Pair<ByteArray, String>>()
+    private var writing = false
+
     private fun send(frame: ByteArray, what: String) {
+        if (gatt == null || cmdChar == null) { log("Non connesso"); return }
+        writeQueue.add(frame to what)
+        pumpQueue()
+    }
+
+    /** One outstanding GATT write at a time; a confirmed write also triggers bonding if needed. */
+    private fun pumpQueue() {
+        if (writing) return
         val g = gatt; val c = cmdChar
-        if (g == null || c == null) { log("Non connesso"); return }
-        log("TX $what: ${frame.toHex()}")
-        // WRITE_TYPE_DEFAULT (with response): a confirmed write triggers bonding if needed.
-        g.writeCharacteristic(c, frame, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+        val next = writeQueue.removeFirstOrNull() ?: return
+        if (g == null || c == null) return
+        log("TX ${next.second}: ${next.first.toHex()}")
+        writing = true
+        g.writeCharacteristic(c, next.first, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
     }
 
     fun sendHello() = send(Whoop5Protocol.hello(seq++), "hello")
-    fun sendBuzz(loops: Int = 1) = send(Whoop5Protocol.buzz(loops, seq++), "buzz")
-
+    fun sendBuzz(pattern: String = Whoop5Protocol.DEFAULT_PATTERN, loops: Int = 1) =
+        send(Whoop5Protocol.buzz(pattern, loops, seq++), "buzz $pattern x$loops")
     fun disconnect() {
-        gatt?.close(); gatt = null; cmdChar = null
+        val g = gatt; gatt = null; cmdChar = null
+        writeQueue.clear(); writing = false
+        g?.disconnect(); g?.close()
     }
 }

@@ -10,9 +10,13 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
-        android:label="WhoopBuzz PoC"
+        android:label="WhoopBuzz"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".PocActivity" android:exported="true">
             <intent-filter>
@@ -20,5 +24,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service android:name=".WhoopService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <receiver android:name=".BuzzReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="com.whoopbuzz.BUZZ" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -24,13 +24,22 @@ object Whoop5Protocol {
     /** STOP_HAPTICS. */
     const val CMD_STOP_HAPTICS = 122
 
-    /** The canonical waveform-effect bytes shared by the official buzz and alarm. */
-    private val WAVEFORM_EFFECTS = byteArrayOf(47, 152.toByte(), 0, 0, 0, 0, 0, 0)
+    /** Named haptic patterns (effect ids). A/B are single effects, C is the original two-pulse pair. */
+    val PATTERNS: Map<String, List<Int>> = mapOf(
+        "A" to listOf(47),
+        "B" to listOf(152),
+        "C" to listOf(47, 152),
+    )
+    const val DEFAULT_PATTERN = "A"
 
     /** Payload of CMD_RUN_HAPTIC_MAVERICK: [rev=1][8 effects][loopControl u16=0][overallLoop]. */
-    fun buzzPayload(loops: Int): ByteArray =
-        byteArrayOf(0x01) + WAVEFORM_EFFECTS + byteArrayOf(0x00, 0x00, loops.coerceIn(1, 255).toByte())
+    fun buzzPayload(effects: List<Int>, loops: Int): ByteArray {
+        val eff = ByteArray(8) { i -> (effects.getOrElse(i) { 0 } and 0xFF).toByte() }
+        return byteArrayOf(0x01) + eff + byteArrayOf(0x00, 0x00, loops.coerceIn(1, 255).toByte())
+    }
 
+    fun buzzPayload(pattern: String, loops: Int): ByteArray =
+        buzzPayload(PATTERNS[pattern.uppercase()] ?: PATTERNS.getValue(DEFAULT_PATTERN), loops)
     fun crc16Modbus(data: ByteArray, from: Int = 0, to: Int = data.size): Int {
         var crc = 0xFFFF
         for (i in from until to) {
@@ -71,7 +80,8 @@ object Whoop5Protocol {
     /** Session opener: GET_HELLO with param 0x01 (identical to the known static CLIENT_HELLO). */
     fun hello(seq: Int = 1): ByteArray = command(CMD_GET_HELLO, seq, byteArrayOf(0x01))
 
-    fun buzz(loops: Int = 1, seq: Int = 2): ByteArray = command(CMD_RUN_HAPTIC_MAVERICK, seq, buzzPayload(loops))
+    fun buzz(pattern: String = DEFAULT_PATTERN, loops: Int = 1, seq: Int = 2): ByteArray =
+        command(CMD_RUN_HAPTIC_MAVERICK, seq, buzzPayload(pattern, loops))
 }
 
 fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
