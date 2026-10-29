@@ -119,10 +119,12 @@ class WhoopService : Service() {
         @Volatile var instance: WhoopService? = null
 
         fun start(c: Context) {
+            Prefs.setServiceEnabled(c, true)
             c.startForegroundService(Intent(c, WhoopService::class.java))
         }
 
         fun stop(c: Context) {
+            Prefs.setServiceEnabled(c, false)
             c.startService(Intent(c, WhoopService::class.java).setAction(ACTION_STOP))
         }
     }

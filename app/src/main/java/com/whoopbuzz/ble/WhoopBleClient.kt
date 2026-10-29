@@ -6,7 +6,6 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
-import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
@@ -20,8 +19,9 @@ import com.whoopbuzz.protocol.toHex
 import java.util.UUID
 
 /**
- * Minimal PoC client for a WHOOP 5.0/MG: scan -> connect -> hello -> buzz.
- * Caller must hold BLUETOOTH_SCAN / BLUETOOTH_CONNECT before calling.
+ * Low-power BLE client for WHOOP 5.0/MG:
+ * Connects to the bonded strap and writes commands to fd4b0002 without subscribing to
+ * high-frequency telemetry notify channels (zero idle CPU wakeups).
  */
 @SuppressLint("MissingPermission")
 class WhoopBleClient(
@@ -37,7 +37,6 @@ class WhoopBleClient(
     private var gatt: BluetoothGatt? = null
     private var cmdChar: BluetoothGattCharacteristic? = null
     private var seq = 1
-    private val pendingNotify = ArrayDeque<BluetoothGattCharacteristic>()
 
     val isConnected get() = cmdChar != null
 
@@ -65,8 +64,7 @@ class WhoopBleClient(
     fun startScan() {
         val byService = ScanFilter.Builder()
             .setServiceUuid(ParcelUuid(UUID.fromString(Whoop5Protocol.SERVICE_UUID))).build()
-        val byName = ScanFilter.Builder().setDeviceName("WHOOP").build()
-        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build()
         log("Scansione WHOOP 5.0/MG...")
         adapter.bluetoothLeScanner.startScan(listOf(byService), settings, scanCb)
     }
@@ -95,45 +93,16 @@ class WhoopBleClient(
             val svc = g.getService(UUID.fromString(Whoop5Protocol.SERVICE_UUID))
             if (svc == null) { log("Servizio WHOOP 5 non trovato"); return }
             cmdChar = svc.getCharacteristic(UUID.fromString(Whoop5Protocol.COMMAND_CHAR_UUID))
-            Whoop5Protocol.NOTIFY_CHAR_UUIDS.forEach { id ->
-                svc.getCharacteristic(UUID.fromString(id))?.let { pendingNotify.add(it) }
-            }
-            log("Servizi trovati, abilito notifiche (${pendingNotify.size})")
-            nextNotify(g)
-        }
-
-        override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, status: Int) {
-            nextNotify(g)
+            if (cmdChar == null) { log("Caratteristica comando non trovata"); return }
+            log("Pronto (modalita zero-telemetria).")
+            sendHello()
+            onReady()
         }
 
         override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
-            log("Write ${c.uuid.toString().take(8)} status=$status")
             writing = false
             pumpQueue()
         }
-
-        @Deprecated("Deprecated in API 33")
-        override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic) {
-            log("RX ${c.uuid.toString().take(8)}: ${c.value?.toHex()}")
-        }
-
-        override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic, value: ByteArray) {
-            log("RX ${c.uuid.toString().take(8)}: ${value.toHex()}")
-        }
-    }
-
-    private fun nextNotify(g: BluetoothGatt) {
-        val c = pendingNotify.removeFirstOrNull()
-        if (c == null) {
-            log("Pronto.")
-            sendHello()
-            onReady()
-            return
-        }
-        g.setCharacteristicNotification(c, true)
-        val cccd = c.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
-        if (cccd == null) { nextNotify(g); return }
-        g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
     }
 
     private val writeQueue = ArrayDeque<Pair<ByteArray, String>>()
@@ -157,8 +126,9 @@ class WhoopBleClient(
     }
 
     fun sendHello() = send(Whoop5Protocol.hello(seq++), "hello")
-    fun sendBuzz(pattern: String = Whoop5Protocol.DEFAULT_PATTERN, loops: Int = 1) =
+    fun sendBuzz(pattern: String = Whoop5Protocol.DEFAULT_PATTERN, loops: Int = 0) =
         send(Whoop5Protocol.buzz(pattern, loops, seq++), "buzz $pattern x$loops")
+
     fun disconnect() {
         val g = gatt; gatt = null; cmdChar = null
         writeQueue.clear(); writing = false

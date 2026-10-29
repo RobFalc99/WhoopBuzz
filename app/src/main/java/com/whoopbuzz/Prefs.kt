@@ -10,6 +10,10 @@ object Prefs {
     fun token(c: Context): String = sp(c).getString("token", "") ?: ""
     fun setToken(c: Context, t: String) = sp(c).edit().putString("token", t.trim()).apply()
 
+    fun isServiceEnabled(c: Context): Boolean = sp(c).getBoolean("service_enabled", false)
+    fun setServiceEnabled(c: Context, enabled: Boolean) =
+        sp(c).edit().putBoolean("service_enabled", enabled).apply()
+
     fun patterns(c: Context): List<SavedPattern> =
         PatternStoreCodec.decode(sp(c).getString("patterns_v1", null))
 
