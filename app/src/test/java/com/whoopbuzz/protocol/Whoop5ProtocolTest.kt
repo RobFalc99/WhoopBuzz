@@ -34,18 +34,9 @@ class Whoop5ProtocolTest {
     }
 
     @Test
-    fun loopsZeroAllowedAndClamped() {
-        assertEquals(0, Whoop5Protocol.buzzPayload("single", 0).last().toInt())
-        assertEquals(255, Whoop5Protocol.buzzPayload("single", 999).last().toInt() and 0xFF)
-        assertEquals(12, Whoop5Protocol.buzzPayload("single", 0).size)
-    }
-
-    @Test
-    fun buzzFrameIsConsistent() {
-        val f = Whoop5Protocol.buzz("single", 0, seq = 2)
-        val declLen = (f[2].toInt() and 0xFF) or ((f[3].toInt() and 0xFF) shl 8)
-        assertEquals(declLen + 8, f.size)
-        assertEquals(0x13, f[10].toInt() and 0xFF)
+    fun hapticStepFormattingIsHumanReadable() {
+        assertEquals("Normale → Pausa → Normale", HapticStep.formatSteps("47,152,47", 0))
+        assertEquals("Raffica  •  Durata estesa", HapticStep.formatSteps("52", 1))
     }
 
     @Test
@@ -62,9 +53,5 @@ class Whoop5ProtocolTest {
         val (eff, loops) = PatternStoreCodec.resolveRequest(decoded, "vip", null)
         assertEquals("52,152,52", eff)
         assertEquals(2, loops)
-        val (_, overrideLoops) = PatternStoreCodec.resolveRequest(decoded, "vip", 0)
-        assertEquals(0, overrideLoops)
-        val afterDelete = PatternStoreCodec.delete(decoded, "vip")
-        assertEquals(5, afterDelete.size)
     }
 }

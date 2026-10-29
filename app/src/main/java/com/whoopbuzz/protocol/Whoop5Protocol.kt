@@ -2,6 +2,27 @@ package com.whoopbuzz.protocol
 
 import java.util.zip.CRC32
 
+/** Human-readable building blocks for composing haptic sequences without raw numbers. */
+enum class HapticStep(val label: String, val code: Int) {
+    NORMAL("Normale", 47),
+    PAUSE("Pausa", 152),
+    BURST("Raffica", 52),
+    MEDIUM("Medio", 15),
+    SHORT("Corto", 14),
+    TAP("Tocco", 1);
+
+    companion object {
+        fun labelFor(code: Int): String =
+            entries.firstOrNull { it.code == code }?.label ?: if (code >= 128) "Pausa" else "Impulso"
+
+        fun formatSteps(effectsSpec: String, loops: Int = 0): String {
+            val steps = Whoop5Protocol.parseEffects(effectsSpec).map { labelFor(it) }
+            val base = if (steps.isEmpty()) "—" else steps.joinToString(" → ")
+            return if (loops > 0) "$base  •  Durata estesa" else base
+        }
+    }
+}
+
 /** User-defined or preset haptic pattern persisted by name. */
 data class SavedPattern(
     val name: String,
@@ -53,10 +74,6 @@ object PatternStoreCodec {
     fun delete(list: List<SavedPattern>, name: String): List<SavedPattern> =
         list.filterNot { it.name.equals(name.trim(), ignoreCase = true) }
 
-    /**
-     * Resolve a pattern name or raw effects string against saved patterns first, then built-ins.
-     * Returns pair of (effectsSpec, loops).
-     */
     fun resolveRequest(
         saved: List<SavedPattern>,
         spec: String,
@@ -74,8 +91,6 @@ object PatternStoreCodec {
 
 /**
  * WHOOP 5.0 / MG ("puffin") wire protocol: frame builder + haptic payload.
- * Byte layouts come from community reverse engineering (noop / goose); see docs/.
- * Pure Kotlin (no Android types) so it is unit-testable on the JVM.
  */
 object Whoop5Protocol {
     const val SERVICE_UUID = "fd4b0001-cce1-4033-93ce-002d5875f58a"
@@ -89,15 +104,11 @@ object Whoop5Protocol {
 
     const val TYPE_COMMAND = 0x23
     const val CMD_GET_HELLO = 0x91
-    /** RUN_HAPTIC_PATTERN_MAVERICK: one-shot buzz on a 5.0/MG strap. */
     const val CMD_RUN_HAPTIC_MAVERICK = 0x13
-    /** STOP_HAPTICS. */
     const val CMD_STOP_HAPTICS = 122
 
-    /** Hardware-verified pause byte on WHOOP 5.0/MG (produces a clean gap between 47 pulses). */
     const val VERIFIED_PAUSE = 152
 
-    /** Named haptic patterns (sequence of effect ids / pauses). A, B, C are legacy aliases. */
     val PATTERNS: Map<String, List<Int>> = mapOf(
         "single" to listOf(47),
         "double" to listOf(47, VERIFIED_PAUSE, 47),
@@ -110,17 +121,14 @@ object Whoop5Protocol {
     )
     const val DEFAULT_PATTERN = "single"
 
-    /** Parse "47,152,47" into ids; non-numeric parts are ignored, ids clamped to 0..255, max 8. */
     fun parseEffects(spec: String): List<Int> =
         spec.split(',', ' ', ';').mapNotNull { it.trim().toIntOrNull() }.map { it.coerceIn(0, 255) }.take(8)
 
-    /** A pattern name or a comma separated effect list. */
     fun resolve(spec: String): List<Int> {
         val named = PATTERNS.entries.firstOrNull { it.key.equals(spec.trim(), ignoreCase = true) }?.value
         return named ?: parseEffects(spec).ifEmpty { PATTERNS.getValue(DEFAULT_PATTERN) }
     }
 
-    /** Payload of CMD_RUN_HAPTIC_MAVERICK: [rev=1][8 effects][loopControl u16=0][overallLoop]. */
     fun buzzPayload(effects: List<Int>, loops: Int): ByteArray {
         val eff = ByteArray(8) { i -> (effects.getOrElse(i) { 0 } and 0xFF).toByte() }
         return byteArrayOf(0x01) + eff + byteArrayOf(0x00, 0x00, loops.coerceIn(0, 255).toByte())
