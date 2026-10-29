@@ -40,6 +40,10 @@ object PatternStoreCodec {
         SavedPattern("triple", "47,152,47,152,47", 0),
         SavedPattern("long", "47,47,47", 0),
         SavedPattern("pulse", "52", 0),
+        SavedPattern("heartbeat", "14,152,15", 0),
+        SavedPattern("escalate", "1,152,14,152,47,152,15", 0),
+        SavedPattern("gentle", "1,152,1", 0),
+        SavedPattern("alarm", "47,47,152,52", 0),
     )
 
     fun encode(list: List<SavedPattern>): String =
@@ -115,6 +119,10 @@ object Whoop5Protocol {
         "triple" to listOf(47, VERIFIED_PAUSE, 47, VERIFIED_PAUSE, 47),
         "long" to listOf(47, 47, 47),
         "pulse" to listOf(52),
+        "heartbeat" to listOf(14, VERIFIED_PAUSE, 15),
+        "escalate" to listOf(1, VERIFIED_PAUSE, 14, VERIFIED_PAUSE, 47, VERIFIED_PAUSE, 15),
+        "gentle" to listOf(1, VERIFIED_PAUSE, 1),
+        "alarm" to listOf(47, 47, VERIFIED_PAUSE, 52),
         "A" to listOf(47),
         "B" to listOf(152),
         "C" to listOf(47, 152),

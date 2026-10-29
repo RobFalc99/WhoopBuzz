@@ -23,14 +23,16 @@ class Whoop5ProtocolTest {
     }
 
     @Test
-    fun resolveNamesAndFallback() {
+    fun resolveAllBuiltInRhythms() {
         assertEquals(listOf(47), Whoop5Protocol.resolve("SINGLE"))
         assertEquals(listOf(47, 152, 47), Whoop5Protocol.resolve("double"))
         assertEquals(listOf(47, 152, 47, 152, 47), Whoop5Protocol.resolve("triple"))
         assertEquals(listOf(47, 47, 47), Whoop5Protocol.resolve("long"))
         assertEquals(listOf(52), Whoop5Protocol.resolve("pulse"))
-        assertEquals(listOf(47), Whoop5Protocol.resolve("nonsense"))
-        assertEquals(listOf(14, 15), Whoop5Protocol.resolve("14,15"))
+        assertEquals(listOf(14, 152, 15), Whoop5Protocol.resolve("heartbeat"))
+        assertEquals(listOf(1, 152, 14, 152, 47, 152, 15), Whoop5Protocol.resolve("escalate"))
+        assertEquals(listOf(1, 152, 1), Whoop5Protocol.resolve("gentle"))
+        assertEquals(listOf(47, 47, 152, 52), Whoop5Protocol.resolve("alarm"))
     }
 
     @Test
@@ -42,11 +44,11 @@ class Whoop5ProtocolTest {
     @Test
     fun patternStoreCodecRoundTripAndUpsert() {
         val initial = PatternStoreCodec.decode(null)
-        assertEquals(5, initial.size)
+        assertEquals(9, initial.size)
         val updated = PatternStoreCodec.upsert(initial, SavedPattern("vip", "52, 152, 47", 1))
-        assertEquals(6, updated.size)
+        assertEquals(10, updated.size)
         val replaced = PatternStoreCodec.upsert(updated, SavedPattern("VIP", "52,152,52", 2))
-        assertEquals(6, replaced.size)
+        assertEquals(10, replaced.size)
         val encoded = PatternStoreCodec.encode(replaced)
         val decoded = PatternStoreCodec.decode(encoded)
         assertEquals(replaced, decoded)
