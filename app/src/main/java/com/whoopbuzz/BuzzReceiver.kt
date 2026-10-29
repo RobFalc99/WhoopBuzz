@@ -8,10 +8,10 @@ import com.whoopbuzz.protocol.Whoop5Protocol
 
 /**
  * Entry point for automation apps (MacroDroid/Tasker).
- * Broadcast action `com.whoopbuzz.BUZZ`, extras:
- * - token (required)
+ * Broadcast action `com.whoopbuzz.BUZZ`, package `com.whoopbuzz`, extras:
  * - pattern (saved custom pattern name or built-in single/double/triple/long/pulse)
- * - effects (optional raw "47,152,47", overrides pattern)
+ * - token (only required if a non-empty token is set in the app)
+ * - effects (optional raw override)
  * - loops (optional 0-5; defaults to the saved pattern's loops)
  */
 class BuzzReceiver : BroadcastReceiver() {
@@ -19,8 +19,8 @@ class BuzzReceiver : BroadcastReceiver() {
         if (intent.action != ACTION_BUZZ) return
         val saved = Prefs.token(context)
         val given = intent.getStringExtra("token") ?: ""
-        if (saved.isEmpty() || given != saved) {
-            Log.add("Broadcast rifiutato: token mancante o errato")
+        if (saved.isNotEmpty() && given != saved) {
+            Log.add("Broadcast rifiutato: token errato")
             return
         }
         val spec = intent.getStringExtra("effects")
@@ -33,7 +33,7 @@ class BuzzReceiver : BroadcastReceiver() {
         }
         val (resolvedSpec, resolvedLoops) =
             PatternStoreCodec.resolveRequest(Prefs.patterns(context), spec, explicitLoops)
-        Log.add("Broadcast buzz: '$spec' -> effects=$resolvedSpec loops=$resolvedLoops")
+        Log.add("Broadcast ricevuto: '$spec'")
         val svc = WhoopService.instance
         if (svc != null) svc.buzz(resolvedSpec, resolvedLoops)
         else try {

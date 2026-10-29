@@ -1,15 +1,19 @@
 package com.whoopbuzz
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -75,6 +79,11 @@ class PocActivity : ComponentActivity() {
                     val s = WhoopService.instance
                     if (s == null) Log.add("Avvia prima il servizio") else s.buzz(spec, loops)
                 }
+                fun copyToClipboard(label: String, value: String) {
+                    val cm = getSystemService(ClipboardManager::class.java)
+                    cm.setPrimaryClip(ClipData.newPlainText(label, value))
+                    Toast.makeText(this, "Copiato: $value", Toast.LENGTH_SHORT).show()
+                }
 
                 Column(
                     Modifier
@@ -101,7 +110,7 @@ class PocActivity : ComponentActivity() {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("I miei Pattern", style = MaterialTheme.typography.titleSmall)
+                        Text("I miei Pattern (tocca il nome per copiarlo)", style = MaterialTheme.typography.titleSmall)
                         TextButton(onClick = {
                             savedPatterns = Prefs.resetDefaultPatterns(this@PocActivity)
                             Log.add("Pattern predefiniti ripristinati")
@@ -114,8 +123,10 @@ class PocActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(p.name, style = MaterialTheme.typography.bodyMedium)
+                                Column(
+                                    Modifier.weight(1f).clickable { copyToClipboard("pattern", p.name) },
+                                ) {
+                                    Text("${p.name}  📋", style = MaterialTheme.typography.bodyMedium)
                                     Text(
                                         HapticStep.formatSteps(p.effects, p.loops),
                                         fontSize = 11.sp,
@@ -245,10 +256,35 @@ class PocActivity : ComponentActivity() {
                     }
 
                     HorizontalDivider()
+                    Text("Collega a MacroDroid (Invia Intent → Broadcast)", style = MaterialTheme.typography.titleSmall)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        OutlinedButton(onClick = { copyToClipboard("Action", BuzzReceiver.ACTION_BUZZ) }) {
+                            Text("📋 Action: com.whoopbuzz.BUZZ", fontSize = 11.sp)
+                        }
+                        OutlinedButton(onClick = { copyToClipboard("Package", packageName) }) {
+                            Text("📋 Package: com.whoopbuzz", fontSize = 11.sp)
+                        }
+                        Button(onClick = {
+                            val firstPattern = savedPatterns.firstOrNull()?.name ?: "single"
+                            sendBroadcast(
+                                Intent(BuzzReceiver.ACTION_BUZZ)
+                                    .setPackage(packageName)
+                                    .putExtra("pattern", firstPattern)
+                                    .putExtra("token", token)
+                            )
+                        }) { Text("Test Broadcast", fontSize = 11.sp) }
+                    }
+                    Text(
+                        "In MacroDroid aggiungi l'extra 'pattern' con il nome del pattern (es. double, pulse, vip).",
+                        fontSize = 11.sp,
+                    )
                     OutlinedTextField(
                         value = token,
                         onValueChange = { token = it; Prefs.setToken(this@PocActivity, it) },
-                        label = { Text("Token per MacroDroid (extra pattern=<nome>)") },
+                        label = { Text("Token opzionale (lascia vuoto per non richiederlo)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
